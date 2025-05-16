@@ -32,6 +32,12 @@ post '/payload' do
     # e.g. https://api.github.com/repos/baxterthehacker/public-repo/pulls{/number}
     pulls_url = parsed['repository']['pulls_url']
     
+    # Validate that the URL belongs to the trusted GitHub domain
+    uri = URI.parse(pulls_url)
+    unless uri.host == "api.github.com"
+      halt 400, "Invalid pulls_url domain"
+    end
+    
     # Pull off the "{/number}" and search for all Pull Requests
     # that include the branch
     pulls_url_filtered = pulls_url.split('{').first + "?head=#{repo_owner}:#{branch_name}"
@@ -45,6 +51,13 @@ post '/payload' do
 
         # Get all Reviews for a Pull Request via API
         review_url_orig = pull_request["url"] + "/reviews"
+        
+        # Validate that the URL belongs to the trusted GitHub domain
+        uri = URI.parse(review_url_orig)
+        unless uri.host == "api.github.com"
+          halt 400, "Invalid review_url_orig domain"
+        end
+        
         reviews = get(review_url_orig)
 
         reviews.each do |review|
@@ -54,6 +67,13 @@ post '/payload' do
             puts "INFO: found an approved Review"
             review_id = review["id"]
             dismiss_url = review_url_orig + "/#{review_id}/dismissals"
+            
+            # Validate that the URL belongs to the trusted GitHub domain
+            uri = URI.parse(dismiss_url)
+            unless uri.host == "api.github.com"
+              halt 400, "Invalid dismiss_url domain"
+            end
+            
             put(dismiss_url)
           end
         end.empty? and begin
