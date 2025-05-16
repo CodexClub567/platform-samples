@@ -1,0 +1,58 @@
+# This workflow uses third-party actions; review their terms and pin by commit SHA for security.
+# It generates a SLSA provenance file for your project at SLSA Level 3.
+# For more info, visit https://slsa.dev and https://github.com/slsa-framework/slsa-github-generator.
+
+name: SLSA generic generator
+
+on:
+  workflow_dispatch:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      digests: ${{ steps.hash.outputs.digests }}
+    steps:
+      - name: Checkout repository
+        # Always pin actions to a commit SHA for supply chain security
+        uses: actions/checkout@v4
+        with:
+          # You may want to pin to a specific commit SHA:
+          # ref: 2b9d5b6a8e5e2ab192b7f6c2e0b9f8e13b6a1f6d
+
+      # ========================================================
+      # Step 1: Build your artifacts and place them in dist/
+      # Replace these lines with your actual build commands.
+      # ========================================================
+      - name: Build artifacts
+        run: |
+          mkdir -p dist
+          echo "artifact1" > dist/artifact1
+          echo "artifact2" > dist/artifact2
+
+      # ========================================================
+      # Step 2: Generate provenance subjects (hashes) for ALL artifacts.
+      # Explicitly list expected artifact files for best security.
+      # ========================================================
+      - name: Generate subject for provenance
+        id: hash
+        run: |
+          set -euo pipefail
+          files="dist/artifact1 dist/artifact2"
+          echo "hashes=$(sha256sum $files | base64 -w0)" >> "${GITHUB_OUTPUT}"
+
+  provenance:
+    needs: [build]
+    permissions:
+      actions: read   # To read the workflow path.
+      id-token: write # To sign the provenance.
+      contents: write # To add assets to a release.
+    # Pin the reusable workflow to a commit SHA for security
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.4.0
+    # Recommended: replace 'v1.4.0' with the latest commit SHA after review:
+    # uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@<commit-sha>
+    with:
+      base64-subjects: "${{ needs.build.outputs.digests }}"
+      upload-assets: true # Set to false if you do not want to upload provenance to the release
